@@ -1,0 +1,54 @@
+engine:
+  default_backtest_engine: qlib
+  qlib_enabled: true
+  lightweight_enabled: true
+  qlib_config_dir: .
+  baseline_config_name: conf_baseline.yaml
+  combined_config_name: conf_combined_factors.yaml
+dataset:
+  target_column: fwd_returns_4h
+  required_index_levels: [datetime, symbol]
+  signal_exclude_prefixes: [fwd_]
+  time_per_step: "60min"
+  portfolio_key: "60min"
+metrics:
+  annualization_factor: 2190
+  corr_method: spearman
+  transaction_cost:
+    one_way_fee_rate: 0.0004
+    description: "4 bps one-way transaction fee, i.e. 0.04% per side."
+  no_factor_metrics:
+    sharpe: 0.0
+    turnover: 1.0
+    drawdown: 1.0
+    coverage: 0.0
+  default_metric_formula:
+    sharpe_coverage_weight: 0.9
+    sharpe_failure_weight: 0.2
+    turnover_base: 0.18
+    turnover_coverage_weight: 0.27
+    drawdown_base: 0.1
+    drawdown_failure_weight: 0.25
+sample_windows:
+  enabled: true
+  split_mode: chronological_ratio
+  train_ratio: 0.75
+  train_filter:
+    metric: sharpe
+    min_value: 2.0
+robustness_filter:
+  enabled: true
+  market_beta_abs_max: 0.20
+  residual_sharpe_min: 0.50
+  yearly_positive_ratio_min: 0.50
+  max_year_positive_contribution_share: 0.65
+  regime_positive_sharpe_count_min: 2
+resolver:
+  alias_map:
+    vwap_weighted: vwap
+    funding_rate_increase: funding_rate
+    holding_volume_increase: oi_change_pct
+    volume_increase: volume
+    market_volatility: close
+    turnover_rate_control: volume
+  function_token_blacklist: []
