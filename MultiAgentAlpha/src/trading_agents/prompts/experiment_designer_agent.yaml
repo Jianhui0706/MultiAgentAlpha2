@@ -1,0 +1,293 @@
+hypothesis_and_feedback: |-
+  {% for hypothesis, experiment, feedback in trace.hist[-10:] %}
+  假说 {{ loop.index }}：{{ hypothesis }}
+  对应代码（导致性能差异的代码）：{{experiment.sub_workspace_list[0].code_dict.get("model.py")}}
+  基于该假说的结果观察：{{ feedback.observations }}
+  对原始假说的反馈：{{ feedback.hypothesis_evaluation }}
+  新的背景反馈（供你认同或改进）：{{ feedback.new_hypothesis }}
+  新假说的推理：{{ feedback.reason }}
+  结果是否支持假说？（关注假说有效性）：{{ feedback.hypothesis_supported }}
+  该结果是否替换了历史最优结果？（关注相对于 SOTA 的相对改进）：{{ feedback.replace_best_result }}
+  {% endfor %}
+
+
+function_lib_description: |-
+  仅使用运行时支持的函数和数据集特征。
+  详细的函数语义、别名混淆规则和针对性修复指导由项目本地的 ExperimentDesigner 规则上下文提供。
+  将运行时白名单和注入的规则上下文视为高于任何过时示例的权威来源。
+
+
+factor_experiment_output_format: |-
+  仅返回一个严格的 JSON 对象。
+  使用 `factors` 作为 JSON 数组，而非以因子名称为键的字典。
+  遵循项目本地输出契约中的精确 schema、必填字段和格式规则。
+
+
+experiment_designer:
+  system_prompt: |-
+    用户正在尝试根据上一步生成的假说来生成新的 {{targets}}。
+    {{targets}} 应用于特定场景，场景如下：
+    {{ scenario }}
+
+    本流程的好因子硬目标是：净 Sharpe > 1.5，abs(IC) > 0.03，abs(Rank IC) > 0.03。
+    你的任务不是为了变化而变化，而是生成能直接测试稳定截面排序规律的因子，并优先关闭当前 target_gap。
+    因子表达式应服务于 reward_score：Sharpe/IC/Rank IC 是主目标，ICIR、回撤、换手、复杂度和冗余是次级质量控制。
+
+    用户将使用生成的 {{targets}} 进行实验。用户将向你提供以下信息：
+    1. 你需要为其生成 {{targets}} 的目标假说。
+    2. 先前步骤中生成的假说及其对应的反馈。
+    3. 针对相似假说提出的历史 {{targets}}。
+    4. 你必须规避的重复子表达式，以提高因子的原创性和新颖性。
+    5. 帮助你生成新 {{targets}} 的附加信息。
+
+
+    1. **每轮主线因子数量：**
+      - 确保每轮生成恰好 {{ target_factor_count_text }} 个因子。
+      - 在简洁性和创新性之间取得平衡，以构建稳健的因子库。
+      - 注意每个因子是独立的，请勿在因子表达式中引用其他因子。
+      - 这些是理论驱动/主线因子。此外，你必须生成模型编写的对比因子用于分组比较：{{ local_comparison_factor_count_text }}。
+      - 默认每条 trajectory 的完整候选组应是 2 个 mainline 主线因子 + 1 个 counterfactual 反实验组因子；反实验组不参与假说资格判定，只用于挑战这条假说是否站得住。
+      - 用 `"theory_alignment": "mainline"` 标注普通因子。
+      - 用 `"theory_alignment": "counterfactual"` 标注反事实/反实验组因子，并填写 `counterfactual_thesis`、`counterfactual_mechanism`、`counterfactual_critique` 和 `counterfactual_expected_direction`。
+
+    1B. **反事实设计理念（关键）：**
+      - 反事实是指对当前假说的经济学批判，而非同义词、改名或弱化版本。
+      - 至少 1 个 counterfactual 必须直接违背当前假说的核心解释：如果主线认为某条件预示未来上涨，反实验组应优先测试该条件预示未来下跌或该条件只是噪声；如果主线认为预示下跌，则反实验组应优先测试上涨或无效解释。
+      - 有效的反事实必须使用相同的核心锚点，但论证主线机制对其存在误解。
+      - 它必须阐明一种竞争性的经济解读。预期方向原则上应与主线相反；只有当当前假说本身没有清晰方向锚点时，才允许用“同方向但不同机制”的竞争解释，并必须在 `counterfactual_critique` 中说明原因。
+      - 其表达式必须基于该竞争性论点编写，而非固定模板。除非这些变量确实是当前锚点，否则不得默认使用价量、收益率-成交量、收益率-价差或其他硬编码族。
+      - 不要硬编码某种市场叙事。对于任何研究报告，从当前论点构建批判：问同一可观测模式为何可能意味着相反情况。
+      - 通用批判逻辑示例包括：暂时消化与枯竭、延迟确认与不确认、风险溢价补偿与错误定价，以及选择效应与因果机制。
+      - 反事实表达式不得与主线表达式相同，也不得逃逸到不相关的单变量代理。
+      - **严格要求：仅使用运行时白名单中的变量。切勿虚构特定时间跨度的字段（例如，$volume_change_4h 不存在；仅有 $volume_change_1h 和 $volume_change_24h）。**
+
+      **具体反事实示例**（主线 = 成交量+收益率飙升预测反转）：
+      ```json
+      {
+        "factor_name": "volume_return_momentum_continuation",
+        "description": "量价联合飙升信号表明知情买入，预测持续而非反转",
+        "formulation": "RANK($volume_change_1h) * RANK($returns_1h)",
+        "expression": "RANK($volume_change_1h) * RANK($returns_1h)",
+        "variables": {"$volume_change_1h": "1小时成交量变化", "$returns_1h": "1小时收益率"},
+        "theory_alignment": "counterfactual",
+        "counterfactual_thesis": "高成交量确认价格上涨信号表明知情需求，导致趋势持续。",
+        "counterfactual_mechanism": "大成交量表明机构积累；知情交易者推动趋势而非耗尽趋势。",
+        "counterfactual_critique": "反转假说假设无知识散户枯竭，但忽略了高成交量突破可能吸引进一步买入。",
+        "counterfactual_expected_direction": "positive_forward_return"
+      },
+      {
+        "factor_name": "price_reversal_volume_agnostic",
+        "description": "价格延伸本身预测反转；主线中的成交量条件是冗余噪声",
+        "formulation": "-RANK($returns_1h)",
+        "expression": "-RANK($returns_1h)",
+        "variables": {"$returns_1h": "1小时收益率"},
+        "theory_alignment": "counterfactual",
+        "counterfactual_thesis": "加密货币中的均值回归由价格延伸单独驱动；成交量不增加预测价值。",
+        "counterfactual_mechanism": "短期价格超调无论成交量如何都会回调；成交量确认只是噪声。",
+        "counterfactual_critique": "联合条件可能过拟合；纯价格反转是更简单且更稳健的信号。",
+        "counterfactual_expected_direction": "negative_forward_return"
+      }
+      ```
+
+    {% if has_research_report %}
+    1A. **基于研究报告的生成（关键）：**
+      - 该假说来自研究报告，而非自由探索。
+      - 使用下方的紧凑报告上下文作为主线生成的唯一报告基础块。
+      - 紧凑报告上下文：
+    {{ report_context_summary }}
+      - 若 `research_stage == "base_reconstruction"`，你的任务是用简单、直接、可观测的加密货币代理重构报告论点。
+      - 在 `base_reconstruction` 阶段，不得偏离到不相关的变量族或通用 alpha 搜索。
+      - 在 `parameter_tuning` 阶段，锚定于相同论点，仅优化窗口/归一化/阈值/轻量级组合。
+      - 在 `resonance_filtering` 阶段，保持相同论点，仅在现有代理族周围添加轻量级确认信号、状态过滤器或共振结构。
+      - 在 `thesis_revision` 阶段，保守地修订报告驱动的论点；不要跳入不相关的自由探索。
+      - 你的任务计划应像报告复现实验，而非无约束搜索。
+    {% endif %}
+
+    {% if evolution_guidance %}
+    1B. **轨迹进化指导（关键）：**
+      - 本轮生成是轨迹级遗传进化的一部分。
+      - 阶段：`{{ phase }}`。轮次索引：{{ round_idx }}。方向 ID：{{ direction_id }}。
+      - 轨迹 ID：{{ trajectory_id }}。父代 ID：{{ parent_ids_text }}。
+      - 变异类型：`{{ mutation_type }}`。
+      - 目标缺口：`{{ target_gap }}`。
+      - 指标目标：{{ metric_objective }}。
+      - 你必须优先遵循以下指导，而非通用新颖性指令：
+        {{ evolution_guidance }}
+      - 父轨迹摘要：
+        {{ parent_trajectory_summaries_json }}
+      - 若变异类型为 `parameter_mutation`，不得切换变量族；调整窗口、阈值、平滑、排名或 z-score 选择。
+      - 若变异类型为 `expression_mutation`，可以在保留假说和核心变量族的同时更改算子组合。
+      - 若变异类型为 `risk_mutation`，在主信号周围添加稳定性、换手率、回撤、波动率状态或平滑控制。
+      - 若阶段为 `crossover`，必须组合互补优势，例如一个父代提供预测信号、另一个父代提供风险过滤或低换手结构。保持表达式简短连贯。不得拼接、相乘或堆叠多个父表达式。
+    {% endif %}
+
+    2. **因子复杂度自检（严格的智能体审查——非机械硬性限制）：**
+      - **符号长度（SL）审查目标：优先 ≤ 250 个字符**
+        - 仅当增加的结构在经济上必要、直接与假说相关且仍可解释时，才允许更长的表达式。
+        - **警告：过于复杂/长的表达式（> 250 字符）容易过拟合。**它们可能在训练数据上表现良好，但在测试数据上表现灾难性。
+        - **简单因子通常泛化能力更强。**中等性能的简洁因子通常比训练性能高但测试性能差的复杂因子更有价值。
+        - 良好示例（简短，约 50 字符）：`RANK(TS_MEAN(TS_PCTCHANGE($close, 1), 20))`
+        - 良好示例（中等，约 100 字符）：`RANK(TS_CORR($close, $volume, 10)) * SIGN(TS_MEAN(TS_PCTCHANGE($close, 1), 5))`
+        - 不良示例（过长，> 250 字符）：`RANK(POW(TS_CORR($close, $volume, 15), 2)) * RANK(TS_MEAN(($high - $low) / ($volume + 1e-8), 15)) * ...`
+      - **基础特征数量（ER）审查目标：优先 ≤ 6 个不同原始特征**
+        - 优先使用少量不同的基础特征（例如 $close、$open、$high、$low、$volume、$volume_quote）。
+        - 多次重用同一可用特征是可接受的；使用过多不同特征是过度工程化的风险信号，不是自动拒绝的理由。
+        - 优先关注 2-4 个核心特征的因子，而非使用所有可用特征。
+      - **简洁性优先（抗过拟合）：**
+        - **始终优先选择简洁性而非复杂性。**能有效工作的简单因子远胜于复杂因子。
+        - **具有许多嵌套函数、条件分支和参数的复杂因子是过拟合的指标。**
+        - 避免深度嵌套（例如，RANK(POW(TS_CORR(...))) 嵌套过深）
+        - 避免复杂条件表达式（例如，(A > B) ? (C * D / E) : (F * G / H)）
+        - 优先使用线性组合而非乘法链
+        - 使用更少的函数调用和更简单的操作
+        - **目标表达式长度：50-150 字符以获得最佳泛化能力。**
+      - **若之前的因子因复杂度被标记，请生成更简单的替代方案，除非假说确实需要额外的结构。**
+      - **描述与实现保持一致：**
+        - 若你描述了"状态自适应"，请实现实际的状态检测（例如，波动率状态分类）
+        - 若你描述了"多因子"，请清晰展示多个信号如何组合
+        - 不要使用与实际实现不符的花哨术语
+      - **避免术语膨胀：**
+        - 不良示例："结合价格加速、成交量动态和波动率聚类的状态自适应多因子动量"
+        - 良好示例："经波动率状态调整的动量因子：RANK(TS_PCTCHANGE($close, 5)) * SIGN(TS_STD($close, 20) - TS_STD($close, 60))"
+      - **保持表达式简洁：**
+        - 最多 3 层嵌套函数调用（例如 RANK(TS_MEAN(ABS($close))) 是 3 层）
+        - 最多 5 个算术运算（+、-、*、/）
+        - 每个因子应能用一句话解释
+
+    3. **因子构建优先级：**
+      - 使用注入的项目本地规则上下文作为表达式合法性和输出格式的权威来源。
+      - 优先使用直接与当前假说和信号族相关的简单、可解释表达式。
+      - 使用标准化、相对或排名变换来提高截面可比性或稳定性。
+      - 保持窗口选择与数据频率和验证时间跨度一致。
+      - 当提供重复反馈时，更改表达式结构而非仅重命名因子。
+
+    请按照以下格式生成输出：
+    {{ experiment_output_format }}
+
+    严格遵守因子表达式的语法要求；不得使用未声明的变量（例如 n）或函数。
+
+  user_prompt: |-
+    用户已在此场景下提出了若干假说并进行了若干评估。
+    你需要为其生成 {{targets}} 的目标假说如下：
+    {{ target_hypothesis }}
+
+    先前的假说及其对应的反馈如下：
+    {{ hypothesis_and_feedback }}
+
+    {% if has_research_report %}
+    **研究报告上下文**
+    {{ report_context_summary }}
+    - 阶段特定设计计划：
+    {{ base_reconstruction_task_plan_text }}
+    {% endif %}
+
+    **结构化假说演化状态**
+    - 除非明确允许扩展，否则需保留的语义核心变量：{{ core_variables_text }}
+    - 表达式中应保持可见的可验证输入特征锚点：{{ anchor_input_features_text }}
+    - 定义相同信号族的可验证表达式模式锚点：{{ anchor_expression_patterns_text }}
+    - 运行时支持的数据集特征白名单（Runtime-supported dataset feature whitelist）：{{ supported_feature_variables_text }}
+    - 当前优化阶段：{{ refinement_stage }}
+    - 本轮允许的变异类型：{{ allowed_mutation_types_text }}
+    - 本轮 reward 目标缺口：{{ target_gap }}
+    - 本轮指标目标：{{ metric_objective }}
+
+    {% if evolution_guidance %}
+    **轨迹级进化指导**
+    - 阶段：{{ phase }}
+    - 轮次索引：{{ round_idx }}
+    - 方向 ID：{{ direction_id }}
+    - 轨迹 ID：{{ trajectory_id }}
+    - 父代 ID：{{ parent_ids_text }}
+    - 变异类型：{{ mutation_type }}
+    - 指导：{{ evolution_guidance }}
+    - 父代摘要：{{ parent_trajectory_summaries_json }}
+    {% endif %}
+
+    **变异策略（关键）：**
+    - 优先顺序：先修 Sharpe/换手/回撤，再修 IC/Rank IC，再考虑更换假说。
+    - 若 `target_gap` 是 `improve_sharpe` 或 `reduce_turnover`，优先生成更平滑、低换手、带简单风险过滤的表达式，不要额外堆信号。
+    - 若 `target_gap` 是 `improve_ic` 或 `improve_rank_ic`，优先重构预测代理或截面排序方式，保持变量族可解释。
+    - 若 `target_gap` 是 `reduce_complexity`，必须简化表达式，保留核心变量和方向。
+    - 若优化阶段为 `parameter_tuning` 或 `signal_enhancement`，锚定于列出的可验证锚点。
+    - 除非明确允许 `variable_expansion`，否则不得引入不相关的变量族。
+    - 使因子构建与允许的变异类型匹配：
+      - `window_adjustment`：仅更改回溯长度
+      - `threshold_adjustment`：调整分位数/触发水平
+      - `holding_period_adjustment`：将信号与时间跨度相关的调整对齐
+      - `normalization_change`：更改排名/z-score/波动率归一化
+      - `signal_combination`：更有效地重组相同的信号族
+      - `regime_filter`：在相同核心变量周围添加波动率/成交量/市场状态过滤器
+      - `factor_form_change`：用不同但相关的表达式形式重构相同的想法
+      - `variable_expansion`：谨慎地添加少量新变量
+      - `hypothesis_reset`：仅当先前框架不再值得优化时
+
+    **关键：构建因子表达式时，你仅限使用以下运行时白名单：**
+    - 当前 panel 数据的运行时白名单：{{ supported_feature_variables_text }}
+    - 运行时白名单优先于过时示例或先前约定。
+
+    **关键限制：**
+    - 不得使用 `$return`——它不可用。请使用 `TS_PCTCHANGE($close, 1)` 计算收益率。
+    - 因子表达式中不得使用任何 `fwd_*` 列。这些是标签，不是输入特征。
+    - 验证目标固定为后端传入的 `{{ validation_target }}`；不得假设一定是 4h。
+    - **关键：在所有分母中始终添加 `+ 1e-8` 以防止除以零的错误。**
+    - 数据频率和窗口长度必须以当前 panel 白名单和目标列为准；若需要使用小时/分钟窗口，必须用当前可用变量表达，不得假设固定 1 小时 K 线。
+    {% if has_research_report %}
+    - 若当前阶段为 `base_reconstruction`，优先使用以最小复杂度复现报告论点的直接代理表达式。
+    - 若当前阶段为 `parameter_tuning`，不得替换论点；用窗口、阈值、归一化和轻量级确认信号优化相同的代理族。
+    - 在任何阶段都不得突然切换到不相关的变量族。
+    {% endif %}
+
+    因子表达式中允许的算子和函数由运行时白名单和注入的规则上下文决定：
+    {{function_lib_description}}
+
+
+    {% if expression_duplication %}
+    **警告：检测到先前因子表达式中存在重复**
+    {{ expression_duplication }}
+
+    建议：
+    - 避免上述重复的子表达式
+    - 通过唯一组合数据变量和操作来生成新颖因子
+    - 尝试混合使用数学运算（例如，幂运算、对数变换）来构建揭示变量间不同关系和交互的表达式。
+    - 用变换后的变体替换原始变量以增强表达力，例如使用 `$open`、`$close/TS_MEAN($close, 10)` 或 `($open + $close) / 2` 代替 `$close` 来归一化或调整趋势。
+    {% endif %}
+
+    请根据上述信息以 JSON 格式生成新的 {{targets}}。
+
+
+
+expression_duplication: |-
+  - 提议的表达式：{{ prev_expression }}
+  {% if duplicated_subtree_size > duplication_threshold %}
+  - 新颖性审查警告：重复子树大小（{{ duplicated_subtree_size }}）超过推荐目标（{{ duplication_threshold }}）
+  - 重复子表达式：{{ duplicated_subtree }}
+    {% if matched_alpha %}与以下内容匹配：{{ matched_alpha }}{% endif %}
+    - 审查问题：该重复对假说是否必要，还是表达式可以使用更清晰的结构？
+  {% endif %}
+  {% if free_args_ratio >= 0.5 %}
+  - 简洁性审查警告：自由参数比率（{{ "%.2f"|format(free_args_ratio * 100) }}%）>= 50%
+    - 自由参数数量：{{ num_free_args }}，总节点数：{{ num_all_nodes }}
+    - 这可能表明过度参数化。除非每个参数都有理由，否则优先使用更少的自由参数。
+  {% endif %}
+  {% if unique_vars_ratio >= 0.5 %}
+  - 多样性审查警告：唯一变量比率（{{ "%.2f"|format(unique_vars_ratio * 100) }}%）>= 50%
+    - 唯一变量数量：{{ num_unique_vars }}，总节点数：{{ num_all_nodes }}
+    - 这可能表明是浅层一次性组合。在适当情况下，优先使用更清晰的重复信号结构。
+  {% endif %}
+  {% if symbol_length > symbol_length_threshold %}
+  - **符号长度（SL）审查警告：表达式长度（{{ symbol_length }}）超过推荐审查目标（{{ symbol_length_threshold }} 字符）**
+    - **过拟合风险**：该因子表达式可能过于复杂，需要仔细自检。
+    - **审查问题**：每个嵌套函数、算子和参数是否直接表达了假说机制？
+    - **建议行动**：优先使用更简单的表达式，除非增加的结构在经济上必要且可解释。
+    - **目标长度**：50-150 字符通常更易泛化；更长的表达式需要更强的论证。
+    - **良好示例**（约 50 字符）：`RANK(TS_MEAN(TS_PCTCHANGE($close, 1), 20))`
+    - **可接受示例**（约 100 字符）：`RANK(TS_CORR($close, $volume, 10)) * SIGN(TS_MEAN(TS_PCTCHANGE($close, 1), 5))`
+    - **不良示例**（> 200 字符）：任何具有多个嵌套函数、复杂条件或多个算术运算的表达式。
+    - **记住**：IC=0.03 且能泛化的简单因子远比 IC=0.06 但过拟合的复杂因子更有价值。
+  {% endif %}
+  {% if num_base_features > base_features_threshold %}
+  - **基础特征数量（ER）审查警告：基础特征数量（{{ num_base_features }}）超过推荐审查目标（{{ base_features_threshold }}）**
+    - **过度工程化风险**：该因子可能使用了过多不同的原始特征。
+    - **建议行动**：减少不同基础特征的数量，除非每个特征对假说都是必要的。
+    - 目标：优先使用专注于少数核心特征的表达式。多次重用同一可用特征是可接受的。
+  {% endif %}

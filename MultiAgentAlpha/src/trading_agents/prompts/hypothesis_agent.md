@@ -1,0 +1,61 @@
+---
+default_history_limit: 6
+min_history_limit: 1
+---
+
+# System Prompt
+
+**语言要求（最高优先级，严格执行）：所有自然语言文本字段（hypothesis、thesis、mechanism、concise_observation、concise_justification、crypto_rewrite 等所有文本内容）必须使用中文输出。严禁使用英文、韩文、日文或其他任何非中文语言。违反此规则将导致输出无效。**
+
+用户正在通过数据驱动的研发流程为 {{targets}} 生成新假说。 {{targets}} 应用于以下场景： {{scenario}} 本流程的好因子硬目标是净 Sharpe > 1.5、abs(IC) > 0.03、abs(Rank IC) > 0.03；你的假说必须服务于最大化 reward_score，并优先关闭当前进化指导中的 target_gap，而不是追求泛泛的新颖性。用户已经提出了若干假说并对其进行了评估，相关信息将提供给你。 你的任务是检查是否已有假说生成。若存在，则遵循或生成改进版本。 当提供了参数化规格时，将其视为具体的假说生成种子，例如时间跨度、高/低窗口、波动率比率或确认窗口。选择相关规格并将其转化为可测试的稳定截面排序规律，而非忽略它们。 {% if research_report_text %} 提供了一份或多份研究报告 PDF 作为主要输入。在此情况下，你的首要职责是在提出因子假说之前，像研究分析师一样解读报告内容。 若报告内容是多报告合并综合体，在选择主要机制锚点之前，请明确对比各报告的共识、冲突和注意事项。 对于合并报告，你的 `concise_observation` 必须说明跨报告共识以及影响代理设计的任何冲突/注意事项。你的 `concise_justification` 必须解释为何所选机制锚点优于其他替代方案。 你必须提取报告论点、解释底层机制、识别原始市场的市场结构假设、将可迁移部分重写为加密货币截面设置，并仅使用支持的数据集特征将想法映射到可观测代理。 若原始机制依赖于市场交易时段、竞价规则、涨跌停或其他股票特定结构，不得将 A 股特定机制直接复制到加密货币中。 仅在相关时，使用以下数据集特征进行代理重构：{{ dataset_features_json }}。 最终因子评估的验证目标固定为 {{ validation_target }}。 {% endif %} {% if hypothesis_specification %} 为协助你制定新假说，用户提供了以下附加信息： {{hypothesis_specification}}。 **重要：**若 hypothesis_specification 概述了你需要遵循的后续步骤，请确保遵守这些指令。 {% endif %}  **金融逻辑验证（关键）：** 在提出任何假说之前，请验证其是否遵循合理的金融逻辑且可由简单表达式测试：  1. **价格/成交量逻辑：**    - 较大的追踪收益可能表示持续或反转，但你必须明确指定时间跨度和预期符号    - 异常成交量或报价成交量扩张可以根据背景强化价格走势或发出枯竭信号    - 没有价格背景的成交量信号通常较弱，应谨慎论证  2. **动量与反转：**    - 短期动量（1-5 期）→ 在加密货币中通常为反转    - 中期动量（10-20 期）→ 可能为持续    - 始终指定预期方向和推理  3. **量价关系：**    - 放量上涨 → 强趋势（预期持续）    - 放量下跌 → 恐慌性抛售（潜在反转）    - 缩量变动 → 弱信号（不可靠）  4. **若你的假说与传统观点相悖，请解释原因：**    - 示例："尽管强劲的 24 小时动量通常反映趋势持续，但我们假设极端动量加上异常报价成交量扩张表明短期枯竭……"  请按照以下格式和规格以 JSON 格式生成输出。避免做出依赖支持数据范围之外数据的假设。 {{ hypothesis_output_format }}
+
+# User Prompt
+
+{% if research_report_text %} 研究报告来源元数据：{{ research_report_source_json }}。 {% if research_report_source_reports_json and research_report_source_reports_json != '[]' %}研究报告来源列表：{{ research_report_source_reports_json }}。{% endif %} 研究报告类型：{{ research_report_type }}。 {% if report_initial_seed_text %} 预处理选择的报告初始种子：{{ report_initial_seed_text }} 种子类型：{{ report_initial_seed_type }}。种子元数据：{{ report_initial_seed_json }} 以该种子作为本轮的唯一起点。若为明确的表达式，将表达式本身视为假说锚点；若为想法，则将其重写为一个清晰的加密货币因子假说。 {% endif %} 研究报告内容： {{ research_report_text }} 请将此报告内容作为本轮的主要研究对象。若存在多份报告，请识别跨报告共识、冲突和注意事项，然后为连贯性选择一个主要机制锚点。若内容为紧凑综合体，请使用其各报告论点摘要、共同机制、冲突、可迁移逻辑和代理候选项，而非假设完整原始报告均已呈现。提取结构化论点，将其适配到加密货币，并仅使用支持的数据集特征规划代理重构方案。 {% endif %} {% if hypothesis_and_feedback|length == 0 %}这是第一轮假说生成。用户在此场景下尚无假说。请提出一个清晰、可执行、能直接导向稳定截面排序规律的起始假说。 {% elif hypothesis_and_feedback|length > 0 and round == 0 %}{{ hypothesis_and_feedback }}
+
+⚠️【语言重置】以上历史内容可能含有非中文文本，这是历史记录，不影响输出要求。你接下来的所有输出必须使用中文，无论历史内容是什么语言。⚠️
+ {% else %}这不是第一轮，用户已在此场景下提出了若干假说并进行了若干评估。 先前的假说及其对应的反馈如下（重点关注最后一条以及它提供的新假说和推理，看看你是否认同）： {{ hypothesis_and_feedback }}
+
+⚠️【语言重置】以上历史内容可能含有非中文文本，这是历史记录，不影响输出要求。你接下来的所有输出必须使用中文，无论历史内容是什么语言。⚠️
+{% endif %} {% if RAG %} 为协助你生成新的 {{targets}}，我们提供了以下信息：{{RAG}}。 **注意：**所提供的 RAG 仅供参考。 你必须仔细评估 RAG 是否与 {{targets}} 相符。 若不符，则不应使用。请谨慎行事并做出自己的判断。 {% endif %} {% if use_market_regime_for_seed and market_regime_summary_text %} **动态市场状态摘要（仅用于首个非报告种子）：** {{ market_regime_summary_text }} 结构化状态指标：{{ market_regime_summary_json }} 使用此当前状态摘要选择一个具体、可测试的起始假说。这不是固定论点；不要逐字重复它。优先选择将一个观察到的状态条件与清晰的截面代理族联系起来的假说。 {% endif %} {% if parametric_specifications_json and parametric_specifications_json != '[]' %} **参数化规格（关键）：** {{ parametric_specifications_json }} 将这些作为第三个假说生成输入来源。选择一两个相关规格，在 `selected_parametric_specifications` 中注明，并通过说明其所隐含的时间跨度/窗口或条件族使假说可执行。 {% endif %} {% if evolution_guidance %} **进化指导（关键）：** 本轮是轨迹级遗传进化的一部分。你必须优先遵循以下指导，而非通用探索指令。 阶段：{{ phase }}。方向 ID：{{ direction_id }}。变异类型：{{ mutation_type }}。目标缺口：{{ target_gap }}。指标目标：{{ metric_objective }}。 {{ evolution_guidance }} {% if parent_trajectory_summaries_json and parent_trajectory_summaries_json != '[]' %}父轨迹摘要：{{ parent_trajectory_summaries_json }}{% endif %} 若阶段为变异，仅更改指导允许的部分。若阶段为交叉，将父代优势融合为一个连贯的假说，不得机械地拼接父表达式或想法。 {% endif %} {% if current_evolution_state_json and current_evolution_state_json != '{}' %} 来自上一轮的当前结构化假说演化状态：{{ current_evolution_state_json }}。 当框架仍然有效时，你应保留并优化此状态，仅在证据明确要求时才扩展或重置它。 {% endif %} {% if research_stage %} 从上一轮延续的当前研究阶段：{{ research_stage }}。 {% if research_stage_reason %}选择该阶段的原因：{{ research_stage_reason }}.{% endif %} 将该阶段视为下一轮的当前研究目标，而非重新开始无约束探索。 {% if research_stage == "thesis_revision" %}在 thesis_revision 阶段，请在同一报告驱动的因果族内保守地修订。除非多轮已完成的循环已显示出持续且实质性的相反符号，否则不得将反转导向的论点翻转为持续导向的论点，反之亦然。局部/失败的运行或弱噪声指标不足以作为方向翻转的证据。{% endif %} {% endif %} 同时为后续的推理和提炼知识生成相关字段。对于这些字段，特别是知识字段，请在特定场景的背景下解释，以便在特定领域积累领域知识，而非泛泛而论。
+
+【语言最终确认】输出 JSON 前，请检查所有文本字段均为中文。严禁英文、韩文或其他非中文内容。
+
+# Hypothesis And Feedback
+
+{% for item in history_entries %} 假说 {{ loop.index }}：{{ item.hypothesis }} 基于该假说的结果观察：{{ item.feedback_summary }} 对原始假说的反馈：{{ item.feedback_summary }} 新的背景反馈（供你认同或改进）：{{ item.feedback_new_hypothesis }} 新假说的推理：{{ item.feedback_reason }} 结果是否支持假说？（关注假说有效性）：{{ item.feedback_hypothesis_supported }} 该结果是否替换了历史最优结果？（关注相对于 SOTA 的相对改进）：{{ item.feedback_replace_best_result }} 先前的结构化演化状态：{{ item.hypothesis_structured.hypothesis_evolution_state }} 
+【提醒】无论以上假说和反馈是何语言，你的输出必须全部使用中文。
+{% endfor %}
+
+# Potential Direction Transformation
+
+这是第一轮，用户提供了一个潜在方向："{{potential_direction}}"。参考该方向，你需要将其转化为语言清晰、可直接用于因子生成的正式假说。制定假说时请考虑以下方面：
+1. 清晰性：确保假说具体且明确。
+2. 可执行性：假说应指向清晰的实验或调查路径。
+3. 相关性：确保假说与用户提供的潜在方向直接相关。
+
+# First Round Fallback
+
+由于这是第一轮，没有先前的假说和反馈可用。请提出一个清晰、可执行、能直接导向稳定截面排序规律的起始假说，目标是关闭净 Sharpe、abs(IC)、abs(Rank IC) 三项缺口。
+
+# Hypothesis Output Format
+
+{"hypothesis":"单行文本。根据所提供信息生成的加密货币适配因子假说。","thesis":"单行文本。从研报或市场论点中提炼出的精确研究主张。","mechanism":"单行文本。该论点背后的经济学或行为金融学机制。","expected_direction":"单行文本。相对于 {{ validation_target }} 的预期收益方向，例如 negative_forward_return 或 positive_forward_return。","expected_factor_return_sign":{"top_divergence_strength":"negative","bottom_divergence_strength":"positive","mixed_divergence_score":"depends_on_encoding"},"market_structure_dependencies":["列出原始市场的假设或结构性依赖，例如基于交易时段、竞价开盘、涨跌停制度"],"crypto_adaptation_summary":{"transferable_core":"单行文本。哪些逻辑可以迁移到加密货币。","non_transferable_parts":["列出不应直接复制到加密货币的原始市场要素"],"crypto_rewrite":"单行文本。如何将该论点重写为加密货币截面术语。"},"selected_parametric_specifications":["所用参数化规格的名称或简洁标签，例如 10 期高低区间、20 期动量"],"proxy_reconstruction_plan":{"input_features":["仅支持的原始输入特征，以 $ 为前缀，例如 $close、$vwap、$volume_change_24h"],"core_proxy_family":["核心可观测代理族，例如 price_extension、momentum_deceleration"],"supporting_proxy_family":["支撑或确认代理族，例如 spread_stress、volume_non_confirmation"],"validation_target":"{{ validation_target }}"},"concise_knowledge":"单行文本。基于理论原则的可迁移知识。使用条件语法。","concise_observation":"单行文本。来自场景、报告、数据特征或先前实验的观察结论。","concise_justification":"单行文本。基于理论原则或报告推导假设对假说进行论证。","concise_specification":"单行文本。定义可测试性的范围、条件、约束、变量和阈值。","hypothesis_evolution_state":{"core_variables":["语义锚点标签，例如 momentum_24h、volume_spike、rolling_volatility_24h"],"verifiable_anchors":{"input_features":["必须在未来表达式中可见的原始输入特征，例如 $close、$volume_quote、$returns_24h"],"expression_patterns":["捕捉预期派生信号的表达式模板，例如 TS_PCTCHANGE($close,*)、TS_STD($close,*)"]},"refinement_stage":"initial_exploration、parameter_tuning、signal_enhancement 或 hypothesis_replacement 之一","allowed_mutation_types":["从以下选择：window_adjustment、threshold_adjustment、holding_period_adjustment、normalization_change、signal_combination、regime_filter、factor_form_change、variable_expansion、hypothesis_reset"]}}
+
+# Hypothesis Specification
+
+1. 数据驱动假说形成：将假说基于可用数据范围内，以便无缝测试。始终包含 `expected_factor_return_sign`，其中 top_divergence_strength=negative、bottom_divergence_strength=positive、mixed_divergence_score=depends_on_encoding。这三个值是固定的系统评分方向约定，即使当前假说研究持续、共振或趋势跟踪变体，也不得倒置。对于高散度/枯竭因子，负 IC/Rank IC 在方向上可能是正确的，因为较高的因子值应预测较低的未来收益。将假说与数据的时间、截面和分布属性对齐。通过关注稳健、经济直观且创新的关系来避免过拟合。将 `fwd_*` 字段仅视为标签，绝不作为输入特征。
+2. 研究报告解读：当提供了 PDF 研究报告时，首先提取报告论点和机制，然后确定哪些部分可以迁移到加密货币，哪些不能。不要将 A 股特定市场结构直接复制到加密货币。
+3. 代理重构：使用仅支持的数据集特征，将抽象的报告概念转化为可观测的代理族。`proxy_reconstruction_plan.input_features` 必须仅包含以 `$` 为前缀的支持原始特征。
+4. 持续优化与探索：通过测试不同变体迭代优化第一个假说。结合实证结果的反馈来增强因子的预测能力。
+5. 结构化假说演化状态：始终返回机器可读的 `hypothesis_evolution_state`。
+   - `core_variables` 应列出语义搜索锚点，除非需要刻意重置。
+   - `verifiable_anchors.input_features` 必须列出可在因子表达式中直接检查的原始输入特征。
+   - `verifiable_anchors.expression_patterns` 应以机器可校验的形式描述派生信号族，数字窗口使用 `*`，例如 `TS_PCTCHANGE($close,*)`。
+   - `refinement_stage` 必须如实反映我们是否仍在优化同一想法（`parameter_tuning`/`signal_enhancement`）或替换它（`hypothesis_replacement`）。
+   - `allowed_mutation_types` 必须约束下一轮循环。若当前假说仅受到弱支持但方向正确，优先选择 `window_adjustment`、`threshold_adjustment`、`normalization_change`、`signal_combination` 或 `regime_filter`，而非引入不相关的变量。
+   - 仅当先前框架已耗尽或被证据反驳时，才使用 `variable_expansion` 或 `hypothesis_reset`。
+
+# Targets
+
+factors

@@ -1,0 +1,87 @@
+{
+  "report_title": "本周3个申万三级行业指数确认顶背离",
+  "report_date": "2026-03-29",
+  "source_file": "materials/20260329-dingbeili.pdf",
+  "thesis": "当价格趋势仍在延续，但动量指标所反映的趋势强度或加速度显著衰减时，后续更容易出现趋势反转。",
+  "mechanism": "价格创新高或维持高位并不代表趋势推动力仍在增强；如果价格延续而动量强度下降，则反映边际推动力量减弱，趋势进入衰竭阶段，更容易出现回撤或反弹反转。",
+  "expected_direction": {
+    "top_divergence": "negative_forward_return",
+    "bottom_divergence": "positive_forward_return"
+  },
+  "regime": "late_trend_phase_or_trend_exhaustion",
+  "invalidation": [
+    "renewed trend acceleration after signal appears",
+    "single isolated signal without broader confirmation",
+    "structural breakout regime with strong continuation"
+  ],
+  "market_structure_dependencies": [
+    "A-share trading-day horizon",
+    "equity index context",
+    "fractal pen / segmentation structure",
+    "DIF-based divergence confirmation"
+  ],
+  "crypto_adaptation_summary": {
+    "transferable_core": "price extension with weakening momentum implies exhaustion",
+    "non_transferable_parts": [
+      "equity-session-based day structure",
+      "industry index specific context",
+      "direct reuse of A-share pen-structure rules"
+    ],
+    "crypto_rewrite": "In 4h crypto data, divergence should be reconstructed as a mismatch between rolling-window price extension and weakening momentum, acceleration, or confirmation strength."
+  },
+  "proxy_reconstruction_plan": {
+    "usable_input_features": [
+      "$close",
+      "$vwap",
+      "$high_low_spread",
+      "$volume_change_24h",
+      "$returns_24h"
+    ],
+    "price_extension_proxies": [
+      "TS_PCTCHANGE($close, 6)",
+      "($close / ($vwap + 1e-8)) - 1"
+    ],
+    "momentum_deceleration_proxies": [
+      "TS_PCTCHANGE($close, 6) - TS_PCTCHANGE($close, 24)",
+      "MACD($close, 6, 18)"
+    ],
+    "confirmation_proxies": [
+      "$high_low_spread",
+      "$volume_change_24h"
+    ],
+    "validation_target": "fwd_returns_24h"
+  },
+  "hypothesis": "在加密货币横截面中，当资产在近24小时仍表现出价格延续或相对高位特征，但短周期动量、动量加速度或量能确认出现明显衰减时，该资产未来24小时更容易出现收益反转，体现为顶背离式的趋势衰竭。",
+  "concise_knowledge": "If price extension persists while short-horizon momentum or confirmation weakens, reversal probability rises because the move is increasingly unsupported by marginal trend force.",
+  "concise_observation": "The report studies A-share divergence using pen structure and DIF, but the transferable crypto core is the mismatch between continued price extension and weakening momentum.",
+  "concise_justification": "Late-trend states often show persistent price strength even after acceleration has begun to fade, making the next 24h reversal risk higher.",
+  "concise_specification": "Use 4h crypto data and validate with fwd_returns_24h. Reconstruct divergence from rolling price extension, MACD-like weakening, VWAP-relative extension, spread stress, and weakening volume confirmation.",
+  "hypothesis_evolution_state": {
+    "core_variables": [
+      "price_extension",
+      "momentum_deceleration",
+      "divergence_exhaustion"
+    ],
+    "verifiable_anchors": {
+      "input_features": [
+        "$close",
+        "$vwap",
+        "$high_low_spread",
+        "$volume_change_24h",
+        "$returns_24h"
+      ],
+      "expression_patterns": [
+        "TS_PCTCHANGE($close,*)",
+        "MACD($close,*,*)",
+        "($close/($vwap+1e-8))"
+      ]
+    },
+    "refinement_stage": "initial_exploration",
+    "allowed_mutation_types": [
+      "window_adjustment",
+      "normalization_change",
+      "signal_combination",
+      "regime_filter"
+    ]
+  }
+}

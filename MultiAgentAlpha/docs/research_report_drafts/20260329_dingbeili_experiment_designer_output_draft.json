@@ -1,0 +1,72 @@
+{
+  "task_plan": [
+    "Step 1: Reconstruct the report's core divergence logic with simple price-extension proxies, starting from trailing 24h return and relative-high versus VWAP signals.",
+    "Step 2: Reconstruct the momentum-weakening leg with short-vs-medium horizon return slope and MACD-style divergence proxies, keeping expressions simple and interpretable.",
+    "Step 3: Add lightweight exhaustion confirmation using intrabar spread stress and weakening 24h volume change, while avoiding thresholds and complex multi-variable filters in the first round."
+  ],
+  "factors": {
+    "Price_Extension_24H_Rank": {
+      "description": "Cross-sectional ranking of the last 24h return, used as the simplest proxy for ongoing price extension in a late-trend state.",
+      "variables": {
+        "$close": "Close price of the crypto asset.",
+        "TS_PCTCHANGE(A, p)": "Percentage change in sequence A over p periods.",
+        "RANK(A)": "Cross-sectional percentile rank of A."
+      },
+      "formulation": "PE24 = RANK(PCTCHANGE(close, 6))",
+      "expression": "RANK(TS_PCTCHANGE($close, 6))"
+    },
+    "Short_vs_Medium_Momentum_Deceleration": {
+      "description": "Difference between 24h trailing return strength and longer-window return strength, used to capture whether the recent move is losing acceleration relative to the broader trend.",
+      "variables": {
+        "$close": "Close price of the crypto asset.",
+        "TS_PCTCHANGE(A, p)": "Percentage change in sequence A over p periods.",
+        "RANK(A)": "Cross-sectional percentile rank of A."
+      },
+      "formulation": "MD = RANK(PCTCHANGE(close, 6) - PCTCHANGE(close, 24))",
+      "expression": "RANK(TS_PCTCHANGE($close, 6) - TS_PCTCHANGE($close, 24))"
+    },
+    "MACD_Price_Divergence_Proxy": {
+      "description": "Difference between ranked price extension and ranked MACD strength, used as a crypto proxy for price continuing while momentum weakens.",
+      "variables": {
+        "$close": "Close price of the crypto asset.",
+        "TS_PCTCHANGE(A, p)": "Percentage change in sequence A over p periods.",
+        "MACD(A, short_window, long_window)": "Moving Average Convergence Divergence of sequence A.",
+        "RANK(A)": "Cross-sectional percentile rank of A."
+      },
+      "formulation": "MPD = RANK(PCTCHANGE(close, 6)) - RANK(MACD(close, 6, 18))",
+      "expression": "RANK(TS_PCTCHANGE($close, 6)) - RANK(MACD($close, 6, 18))"
+    },
+    "Relative_High_VWAP_Deviation": {
+      "description": "Cross-sectional ranking of close relative to VWAP, used to identify assets trading at stretched levels compared with their local average traded price.",
+      "variables": {
+        "$close": "Close price of the crypto asset.",
+        "$vwap": "Volume-weighted average price of the asset.",
+        "RANK(A)": "Cross-sectional percentile rank of A."
+      },
+      "formulation": "RHV = RANK(close / vwap - 1)",
+      "expression": "RANK(($close / ($vwap + 1e-8)) - 1)"
+    },
+    "Trend_Extension_with_Spread_Stress": {
+      "description": "Interaction between recent price extension and current high-low spread, used to capture unstable continuation in a late-trend phase.",
+      "variables": {
+        "$close": "Close price of the crypto asset.",
+        "$high_low_spread": "Intrabar high-low spread feature.",
+        "TS_PCTCHANGE(A, p)": "Percentage change in sequence A over p periods.",
+        "RANK(A)": "Cross-sectional percentile rank of A."
+      },
+      "formulation": "TSS = RANK(PCTCHANGE(close, 6)) × RANK(high_low_spread)",
+      "expression": "RANK(TS_PCTCHANGE($close, 6)) * RANK($high_low_spread)"
+    },
+    "Price_Up_Volume_Not_Confirming": {
+      "description": "Difference between ranked price extension and ranked 24h volume change, used to capture continued price strength without volume confirmation.",
+      "variables": {
+        "$close": "Close price of the crypto asset.",
+        "$volume_change_24h": "Trailing 24h volume change feature.",
+        "TS_PCTCHANGE(A, p)": "Percentage change in sequence A over p periods.",
+        "RANK(A)": "Cross-sectional percentile rank of A."
+      },
+      "formulation": "PVC = RANK(PCTCHANGE(close, 6)) - RANK(volume_change_24h)",
+      "expression": "RANK(TS_PCTCHANGE($close, 6)) - RANK($volume_change_24h)"
+    }
+  }
+}

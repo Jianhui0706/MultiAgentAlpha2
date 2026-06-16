@@ -1,0 +1,51 @@
+{
+  "target_hypothesis": "在加密货币横截面中，当资产在近24小时仍表现出价格延续或相对高位特征，但短周期动量、动量加速度或量能确认出现明显衰减时，该资产未来24小时更容易出现收益反转，体现为顶背离式的趋势衰竭。",
+  "research_stage": "base_reconstruction",
+  "validation_target": "fwd_returns_24h",
+  "design_principle": "First reconstruct the report's divergence logic using simple observable crypto proxies. In round one, avoid complex thresholding and long expressions. Prefer interpretable proxies for price extension, momentum weakening, and exhaustion confirmation.",
+  "task_plan": [
+    "Step 1: Reconstruct the price-extension component with simple 24h trailing return and relative-high proxies.",
+    "Step 2: Reconstruct the momentum-deceleration component with short-vs-medium horizon return slope and MACD-style weakening proxies.",
+    "Step 3: Reconstruct confirmation signals for exhaustion using VWAP deviation, intrabar spread, and volume-change weakening.",
+    "Step 4: Test simple divergence combinations first, before introducing thresholds, filters, or more complex structures.",
+    "Step 5: Keep every factor directly tied to the thesis of continued price extension with weakening momentum."
+  ],
+  "factors": [
+    {
+      "factor_name": "Price_Extension_24H_Rank",
+      "description": "Cross-sectional ranking of the last 24h return, used as the simplest proxy for ongoing price extension.",
+      "expression": "RANK(TS_PCTCHANGE($close, 6))",
+      "formulation": "Price extension proxy: assets with stronger 24h trailing returns are more likely to be in the late stage of an ongoing move."
+    },
+    {
+      "factor_name": "Short_vs_Medium_Momentum_Deceleration",
+      "description": "Difference between short-horizon and medium-horizon return strength, designed to capture whether momentum is weakening relative to the broader move.",
+      "expression": "RANK(TS_PCTCHANGE($close, 6) - TS_PCTCHANGE($close, 24))",
+      "formulation": "Momentum deceleration proxy: if recent 24h strength is no longer supported by shorter-horizon continuation, the move may be losing acceleration."
+    },
+    {
+      "factor_name": "MACD_Price_Divergence_Proxy",
+      "description": "Difference between ranked price extension and ranked MACD strength, used as a direct crypto proxy for price-vs-DIF divergence.",
+      "expression": "RANK(TS_PCTCHANGE($close, 6)) - RANK(MACD($close, 6, 18))",
+      "formulation": "Divergence proxy: price remains strong while MACD-derived trend strength weakens, resembling top-divergence behavior."
+    },
+    {
+      "factor_name": "Relative_High_VWAP_Deviation",
+      "description": "Cross-sectional ranking of close relative to VWAP, used to identify assets trading at stretched levels versus their local traded average price.",
+      "expression": "RANK(($close / ($vwap + 1e-8)) - 1)",
+      "formulation": "High-level extension proxy: assets trading far above VWAP may be in an overheated state more vulnerable to reversal."
+    },
+    {
+      "factor_name": "Trend_Extension_with_Spread_Stress",
+      "description": "Interaction between trailing price extension and current intrabar spread, used to identify late-trend states with rising instability.",
+      "expression": "RANK(TS_PCTCHANGE($close, 6)) * RANK($high_low_spread)",
+      "formulation": "Exhaustion confirmation proxy: a strong recent move combined with elevated intrabar spread suggests unstable continuation and possible reversal risk."
+    },
+    {
+      "factor_name": "Price_Up_Volume_Not_Confirming",
+      "description": "Difference between ranked price extension and ranked 24h volume change, used to capture cases where price continues but volume confirmation weakens.",
+      "expression": "RANK(TS_PCTCHANGE($close, 6)) - RANK($volume_change_24h)",
+      "formulation": "Volume-confirmation divergence proxy: if price remains strong while 24h volume change does not confirm, the move may be losing marginal support."
+    }
+  ]
+}

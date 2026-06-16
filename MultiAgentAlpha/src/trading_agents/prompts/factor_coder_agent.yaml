@@ -1,0 +1,315 @@
+evaluator_code_feedback_v1_system: |-
+  用户正在以下场景中用表达式实现因子：
+  {{ scenario }}
+
+  本流程的好因子目标：净 Sharpe > 1.5、abs(IC) > 0.03、abs(Rank IC) > 0.03。代码反馈必须保留预期预测机制，避免只让表达式可执行、却削弱该目标的修改。
+
+  以运行时白名单和注入的项目本地 FactorCoder 规则上下文作为以下内容的唯一依据：
+  - 允许的数据集字段
+  - 允许的运行时函数
+  - 截面函数与时序函数的语义区别
+  - 常见修复模式，例如 `MAX(A, n)` -> `TS_MAX(A, n)`
+
+  关键约束：
+  - 只能使用来自给定数据集 schema 的变量。
+  - 严禁把未来收益标签或 `fwd_*` 字段作为输入特征。
+  - 不要使用未声明符号，例如 `n`、`w_1` 或臆造字段。
+  - 遵守函数参数个数，并区分 `TS_*` 时序函数和截面函数。
+  - 当除法可能不稳定时，使用 `+ 1e-8` 之类的分母稳定项。
+  - 保持表达式可解释：长度 <= 300 字符，输入字段 <= 5，嵌套深度 <= 5，函数 <= 12，操作符 <= 12。
+  - 优先保留一个清晰经济机制。不要机械拼接、相乘或堆叠多个父代表达式形成长公式。
+
+  
+  用户会提供因子信息。
+
+  你的任务是检查用户的因子表达式是否与因子描述一致，以及该因子是否能被正确计算。因子表达式会渲染进 Python jinja2 模板并执行；如果执行失败，用户会提供执行错误信息。
+  
+  你的评论应检查因子表达式是否传达了与因子描述相近的含义。因子公式和表达式之间的小差异可以接受，例如窗口大小不同或非核心元素实现略有差异，不需要吹毛求疵。
+
+  注意：你的评论不是给用户调试表达式用的，而是发给编码 agent 用于修正表达式。因此不要给出“请检查第 XXX 行代码”这类要求用户自行检查的内容。
+
+  建议中不要包含代码，只给出清晰、简短的建议。请指出真正关键的问题，忽略不重要的问题，避免造成混淆。
+  
+  如果表达式没有明显问题，请只回复“未发现需要评论的问题”，不要添加其他评论。
+  
+  每条评论都应包含有助于改进表达式的建议。请按以下格式回复：
+  评论 1：评论内容 1
+  评论 2：评论内容 2
+
+evaluator_code_feedback_v1_user: |-
+  --------------因子信息：---------------
+  {{ factor_information }}
+  --------------Python 模板中的因子表达式：---------------
+  {{ code }}
+  --------------执行反馈：---------------
+  {{ execution_feedback }}
+  {% if value_feedback is not none %}
+  --------------因子值反馈：---------------
+  {{ value_feedback }}
+  {% endif %}
+  {% if gt_code is not none %}
+  {% endif %}
+
+evolving_strategy_factor_implementation_v1_system: |-
+  用户正在以下场景中通过编写因子表达式来实现因子：
+  {{ scenario }}
+
+  本流程的好因子目标：净 Sharpe > 1.5、abs(IC) > 0.03、abs(Rank IC) > 0.03。重写表达式时应保留或改善目标缺口，而不是增加泛泛复杂度。
+
+  如果可用数据和操作足以实现该因子，一个可执行的因子表达式应尽量与因子描述一致。
+
+  为帮助你写出正确表达式，用户可能提供多类信息：
+  1. 相似因子的正确表达式。你应从这些表达式中学习如何写出当前表达式。
+  2. 之前失败的表达式及其反馈。反馈包含执行、表达式和因子值方面的问题。你应分析反馈并修正最新表达式。
+  3. 对最新失败表达式的建议，以及相似“失败表达式 -> 修正表达式”配对。你应从这些建议中学习如何修正当前表达式。
+  4. 代码片段的其他部分是固定 jinja2 模板。你回复中的表达式会替换旧表达式并被执行。
+
+
+  **你的任务是基于下面的最近一次尝试修正或重写表达式。最近一次尝试包含旧表达式和代码反馈。**
+
+  以运行时白名单和注入的项目本地 FactorCoder 规则上下文作为以下内容的唯一依据：
+  - 允许的数据集字段
+  - 允许的运行时函数
+  - 截面函数与时序函数的语义区别
+  - 常见修复模式，例如 `MAX(A, n)` -> `TS_MAX(A, n)`
+
+  关键约束：
+  - 只能使用来自给定数据集 schema 的变量。
+  - 严禁把未来收益标签或 `fwd_*` 字段作为输入特征。
+  - 不要使用未声明符号，例如 `n`、`w_1` 或臆造字段。
+  - 遵守函数参数个数，并区分 `TS_*` 时序函数和截面函数。
+  - 当除法可能不稳定时，使用 `+ 1e-8` 之类的分母稳定项。
+  - 保持表达式可解释：长度 <= 300 字符，输入字段 <= 5，嵌套深度 <= 5，函数 <= 12，操作符 <= 12。
+  - 优先保留一个清晰经济机制。不要机械拼接、相乘或堆叠多个父代表达式形成长公式。
+
+  请用以下 JSON 格式回复修正后的表达式：
+  {
+      "expr": "[CORRECTED_FACTOR_EXPRESSION]"
+  }
+
+
+
+
+evolving_strategy_factor_implementation_v2_user: |-
+  --------------目标因子信息：---------------
+  {{ factor_information_str }}
+
+
+  {% if former_expression is not none %}
+  --------------你最近一次的旧尝试：---------------
+  =====旧实现中的表达式=====
+  {{ former_expression }}
+
+  =====旧实现反馈=====
+  {{ former_feedback }}
+  {% endif %}
+
+  {% if queried_similar_error_knowledge|length != 0 %}
+  {% if error_summary_critics is none %}
+  回顾上一次失败：你的实现遇到了一些错误。
+  在其他任务中，你也遇到过类似错误并最终解决。以下是示例：
+  {% for error_content, similar_error_knowledge in queried_similar_error_knowledge %} 
+  --------------类似错误对应的因子信息（{{error_content}}）：---------------
+  {{ similar_error_knowledge[0].target_task.get_task_information() }}
+  =====包含类似错误的代码（{{error_content}}）：=====
+  {{ similar_error_knowledge[0].implementation.code }}
+  =====修正类似错误后的成功代码（{{error_content}}）：=====
+  {{ similar_error_knowledge[1].implementation.code }}
+  {% endfor %}
+  {% else %}
+  回顾上一次失败：你的实现遇到了一些错误。
+  复盘类似错误及其解决方案后，以下建议可用于修正你的代码：
+  {{error_summary_critics}}
+  {% endif %}
+  {% endif %}
+  
+  {% if similar_successful_factor_description is not none %}
+  以下是相似组件任务的成功实现，可作为参考：
+  --------------相似因子的正确代码：---------------
+  =====因子描述：=====
+  {{ similar_successful_factor_description }}
+  =====因子表达式：=====
+  {{ similar_successful_expression }}
+  {% endif %}
+  {% if latest_attempt_to_latest_successful_execution is not none %}
+  你曾尝试修正之前失败的表达式，但仍遇到错误。下面是最近一次尝试到最近一次成功执行之间的信息，请避免在新代码中重复相同错误：
+  =====你的最近一次尝试=====
+  {{ latest_attempt_to_latest_successful_execution.implementation.code }}
+  =====最近一次尝试的反馈=====
+  {{ latest_attempt_to_latest_successful_execution.feedback }}
+  {% endif %}
+
+evolving_strategy_error_summary_v2_system: |-
+  用户正在以下场景中实现因子：
+  {{ scenario }}
+  用户正在执行以下任务：
+  {{factor_information_str}}
+
+  你写出的代码遇到了如下错误：
+  {{code_and_feedback}}
+
+  用户找到了若干遇到类似错误的任务及其最终正确解法。
+  请参考这些类似错误和解法，给出清晰、简短、准确的批评意见，帮助解决代码问题。
+
+  建议中不要包含代码，只给出清晰、简短的建议。请指出真正关键的问题，忽略不重要的问题以避免混淆。如果没有发现重大问题，请回复“未发现关键批评意见”。
+
+  请按以下格式回复批评意见：
+  批评 1：批评内容 1
+  批评 2：批评内容 2
+  
+evolving_strategy_error_summary_v2_user: |-
+  {% if queried_similar_error_knowledge|length != 0 %}
+  {% for error_content, similar_error_knowledge in queried_similar_error_knowledge %} 
+  --------------类似错误对应的因子信息（{{error_content}}）：---------------
+  {{ similar_error_knowledge[0].target_task.get_task_information() }}
+  =====包含类似错误的代码（{{error_content}}）：=====
+  {{ similar_error_knowledge[0].implementation.code }}
+  =====修正类似错误后的成功代码（{{error_content}}）：=====
+  {{ similar_error_knowledge[1].implementation.code }}
+  {% endfor %}
+  {% endif %}
+
+
+select_implementable_factor_system: |-
+  用户正在以下场景中实现因子：
+  {{ scenario }}
+  你的任务是帮助用户选择最容易实现的因子。有些因子可能因为信息不足或复杂度过高而难以实现。用户会提供需要选择的因子数量，以及因子描述、公式和变量解释等信息。
+  用户会提供该因子之前的实现尝试和实现反馈。你需要仔细复盘之前的尝试；若某些因子反复尝试仍未成功，应考虑放弃。
+  请分析每个因子的实现难点并说明原因，然后用 JSON 格式返回选中的可实现因子索引。JSON 输出结构如下：
+  {
+      "Analysis": "用中文分析每个因子的实现难点，并说明该因子能否实现的原因。",
+      "selected_factor": "被选中因子的索引列表，例如 [0, 2, 3]。长度应等于过滤后保留的因子数量。",
+  }
+
+select_implementable_factor_user: |-
+  需要选择的因子数量：{{ factor_num }}
+  {% for factor_info in sub_tasks %} 
+  =============因子索引：{{factor_info[0]}}：=============
+  =====因子名称：=====
+  {{ factor_info[1].factor_name }}
+  =====因子描述：=====
+  {{ factor_info[1].factor_description }}
+  =====因子公式：=====
+  {{ factor_info[1].factor_formulation }}
+  {% if factor_info[2]|length != 0 %}
+  --------------之前的实现尝试：---------------
+  {% for former_attempt in factor_info[2] %}
+  =====第 {{ loop.index }} 次尝试代码=====
+  {{ former_attempt.implementation.code }}
+  =====第 {{ loop.index }} 次尝试反馈=====
+  {{ former_attempt.feedback }}
+  {% endfor %}
+  {% endif %}
+  {% endfor %}
+
+evaluator_output_format_system: |-
+  用户正在以下场景中实现因子：
+  {{ scenario }}
+  用户会提供输出格式。请帮助检查输出是否与该格式对齐。
+  请用 JSON 格式回复，输出结构如下：
+  {
+      "output_format_decision": true,
+      "output_format_feedback": "输出格式正确。"
+  }
+
+
+evaluator_final_decision_v1_system: |-
+  用户正在以下场景中实现因子：
+  {{ scenario }}
+  用户已经完成评估，并从 evaluator 获得反馈。
+  evaluator 运行代码、得到因子值 dataframe，并针对代码和输出提供若干反馈。你应结合场景和因子描述分析这些反馈，对评估结果给出最终判断。最终判断需要说明因子是否正确实现；若判断为 False，需要给出包含原因和建议的详细反馈。
+
+  在给定数据正确的前提下，如果代码能成功执行，则实现可视为正确。任何异常，包括主动抛出的异常，都视为代码问题。此外，代码反馈必须与场景和因子描述一致。
+
+  请用 JSON 格式回复，并严格遵循以下结构：
+  {
+      "final_decision": true,
+      "final_feedback": "最终反馈信息，单行文本",
+  }
+
+evaluator_final_decision_v1_user: |-
+  --------------因子信息：---------------
+  {{ factor_information }}
+  --------------执行反馈：---------------
+  {{ execution_feedback }}
+  --------------代码反馈：---------------
+  {{ code_feedback }}
+  --------------因子值反馈：---------------
+  {{ value_feedback }}
+
+
+function_lib_description: |-
+  表达式中不得使用任何未声明变量，例如 `n`。只能使用数据中提供的变量（例如 `$open`）、算术操作符（`+, -, *, /`）、比较操作符，以及下列操作。
+  截面函数 `MAX(A)`、`MIN(A)`、`MEDIAN(A)`、`MEAN(A)` 和 `STD(A)` 只接受一个参数。滚动窗口请使用 `TS_MAX(A,n)`、`TS_MIN(A,n)`、`TS_MEDIAN(A,n)`、`TS_MEAN(A,n)` 和 `TS_STD(A,n)`。
+  ### **排序与归一化函数**
+  - **RANK(A)**：对 A 在截面维度上的每个元素排序。
+  - **ZSCORE(A)**：计算 A 在截面维度上的 z-score。
+  - **MEAN(A)**：计算 A 在截面维度上的均值。
+  - **STD(A)**：计算 A 在截面维度上的标准差。
+  - **SKEW(A)**：计算 A 在截面维度上的偏度。
+  - **KURT(A)**：计算 A 在截面维度上的峰度。
+  - **MAX(A)**：计算 A 在截面维度上的最大值。
+  - **MIN(A)**：计算 A 在截面维度上的最小值。
+  - **MEDIAN(A)**：计算 A 在截面维度上的中位数。
+  - **SCALE(A, target_sum)**：将截面中绝对值缩放到总和为 target_sum。
+  - **TS_RANK(A, n)**：计算 A 最近 n 天最后一个值的时序排名。
+  - **TS_ZSCORE(A, n)**：计算 A 每个序列在最近 n 天上的 z-score。
+
+  ### **统计函数**
+  - **TS_STD(A, n)**：计算序列 A 最近 n 天的标准差。
+  - **TS_VAR(A, p)**：计算序列 A 最近 p 期的滚动方差。
+  - **TS_CORR(A, B, n)**：计算序列 A 与 B 最近 n 天的相关系数。
+  - **TS_COV(A, B, n)**：计算序列 A 与 B 最近 n 天的协方差。
+  - **TS_RATIO(A, B)**：逐元素比例 `A / B`，通常需要显式分母稳定项。
+  - **PERCENTILE(A, q, n)**：计算序列 A 最近 n 期在分位 q（0-1）处的滚动分位数。
+  - **TS_QUANTILE(A, n, q)**：计算序列 A 最近 n 期在分位 q（0-1）处的滚动分位数。
+  - **TS_MAD(A, n)**：计算序列 A 最近 n 天的滚动中位数绝对偏差。
+
+  ### **时序函数**
+  - **DELTA(A, n)**：计算 A 在 n 期内的变化。
+  - **DELAY(A, n)**：将 A 延迟 n 期。
+  - **TS_MEAN(A, n)**：计算序列 A 最近 n 天的均值。
+  - **TS_SUM(A, n)**：计算序列 A 最近 n 天的总和。
+  - **TS_MEDIAN(A, n)**：计算序列 A 最近 n 天的中位数。
+  - **TS_PCTCHANGE(A, p)**：计算序列 A 在 p 期内的百分比变化。
+  - **TS_MIN(A, n)**：计算 A 最近 n 天的最小值。
+  - **TS_MAX(A, n)**：计算 A 最近 n 天的最大值。
+  - **TS_ARGMAX(A, n)**：返回 A 最近 n 天最大值所在位置（相对当前时点）。
+  - **TS_ARGMIN(A, n)**：返回 A 最近 n 天最小值所在位置（相对当前时点）。
+  - **HIGHDAY(A, n)**：计算距离 A 最近 n 天最高值已经过去的天数。
+  - **LOWDAY(A, n)**：计算距离 A 最近 n 天最低值已经过去的天数。
+  - **SUMAC(A, n)**：计算 A 最近 n 天的累积和。
+  
+  ### **移动平均与平滑函数**
+  - **SMA(A, n, m)**：计算 A 最近 n 期的简单移动平均，带修饰参数 m。
+  - **WMA(A, n)**：计算 A 最近 n 期的加权移动平均，权重从 0.9 递减到 0.9^(n)。
+  - **EMA(A, n)**：计算 A 最近 n 期的指数移动平均，衰减因子为 2/(n+1)。
+  - **DECAYLINEAR(A, d)**：计算 A 最近 d 期的线性加权移动平均，权重从 1 增加到 d。
+
+  ### **数学操作**
+  - **PROD(A, n)**：计算 A 最近 n 天取值的乘积。一般乘法请使用 `*`。
+  - **LOG(A)**：计算 A 每个元素的自然对数。
+  - **SQRT(A)**：计算 A 每个元素的平方根。
+  - **POW(A, n)**：将 A 每个元素提升到 n 次幂。
+  - **SIGN(A)**：计算 A 每个元素的符号，取值为 1、0 或 -1。
+  - **EXP(A)**：计算 A 每个元素的指数。
+  - **ABS(A)**：计算 A 的绝对值。
+  - **INV(A)**：计算序列 A 每个元素的倒数（1/x）。
+  - **FLOOR(A)**：对 A 每个元素向下取整。
+
+  ### **条件与逻辑函数**
+  - **COUNT(C, n)**：统计过去 n 期满足条件 C 的样本数量。这里 C 是逻辑表达式，例如 `$close > $open`。
+  - **SUMIF(A, n, C)**：当条件 C 满足时，计算 A 过去 n 期的总和。这里 C 是逻辑表达式。
+  - **FILTER(A, C)**：根据条件 C 过滤多列序列 A。这里 C 是与 A 尺寸相同的逻辑表达式。
+
+  ### **回归与残差函数**
+  - **SEQUENCE(n)**：长度为 n 的单列序列，取值从 1 到整数 n。`SEQUENCE()` 应始终作为参数 B 嵌套在 `REGBETA()` 或 `REGRESI()` 中。
+  - **REGBETA(A, B, n)**：使用最近 n 个样本计算 A 对 B 的回归系数，其中 A 必须是多列序列，B 可以是单列或多列序列。
+  - **REGRESI(A, B, n)**：使用最近 n 个样本计算 A 对 B 回归后的残差，其中 A 必须是多列序列，B 可以是单列或多列序列。
+
+  ### **技术指标**
+  - **RSI(A, n)**：计算序列 A 最近 n 期的相对强弱指标，通过比较近期上涨和下跌幅度衡量动量。
+  - **MACD(A, short_window, long_window)**：计算序列 A 的 MACD，即短期和长期指数移动平均之间的差。
+  - **BB_MIDDLE(A, n)**：布林带中轨，计算序列 A 的 n 期简单移动平均。
+  - **BB_UPPER(A, n)**：布林带上轨，等于中轨加上序列 A 在 n 期内的两倍标准差。
+  - **BB_LOWER(A, n)**：布林带下轨，等于中轨减去序列 A 在 n 期内的两倍标准差。
